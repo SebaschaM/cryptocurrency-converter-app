@@ -1,10 +1,12 @@
-import { Typography, Box, Card, CardContent, CardActions, Button, TextField, Autocomplete, FormControl, IconButton, ToggleButton } from "@mui/material";
+import { Typography, Box, Card, CardContent, Button, TextField, Autocomplete, FormControl, IconButton, ToggleButton } from "@mui/material";
 import { Navbar, ImageBackground } from "../components";
 import useCripto from "../service/useCripto";
 import { useEffect, useState } from "react";
 import Loader from "../components/Loader/Loader";
 import { useForm } from 'react-hook-form';
 import { SyncAlt } from "@mui/icons-material";
+import { optionsCurrency } from "../seed/optionsCurrency";
+import { ICoinInfoSelected } from "../interface";
 
 interface IFormInput {
     cryptoCurrency: string;
@@ -12,16 +14,10 @@ interface IFormInput {
     amount: number;
 }
 
-interface ICoinInfoSelected {
-    Name: string;
-    FullName: string;
-    ImageUrl: string;
-}
-
 const Home = () => {
 
     //Services
-    const { getCryptocurrencies, compareCryptocurrencies } = useCripto();
+    const { getCryptocurrencies, compareCrytoToCurrency, compareCurrencyToCrypto } = useCripto();
     const [isLoading, setIsLoading] = useState(false);
     //Comparation
     const [comparationResult, setComparationResult] = useState(false);
@@ -66,9 +62,17 @@ const Home = () => {
             setCurrency(data.currency);
             setAmount(data.amount);
             try {
-                const response = await compareCryptocurrencies(data.cryptoCurrency, data.currency);
-                const { PRICE } = response.RAW[data.cryptoCurrency][data.currency]
-                setPriceConversion(PRICE)
+                if (selected) {
+                    const { RAW } = await compareCrytoToCurrency(data.cryptoCurrency, data.currency);
+                    //console.log(RAW)
+                    setPriceConversion(RAW[data.cryptoCurrency][data.currency].PRICE);
+                }
+                else {
+                    const { RAW } = await compareCurrencyToCrypto(data.currency, data.cryptoCurrency);
+                    console.log(RAW)
+                    setPriceConversion(RAW[data.currency][data.cryptoCurrency].PRICE);
+                    //return
+                }
                 setComparationResult(true);
             } catch (error) {
                 console.log(error);
@@ -84,28 +88,20 @@ const Home = () => {
         setComparationResult(false);
     }
 
+    const handleChangePosition = () => {
+
+        if (comparationResult) {
+            setDisableButtonCompare(false);
+            //setCoinInfoSelected({ Name: '', FullName: '', ImageUrl: '' });
+            setComparationResult(false);
+            setPriceConversion(0);
+        }
+
+    }
+
     useEffect(() => {
         handleCryptocurrencies();
     }, []);
-
-    const optionMoneda = [
-        { value: 'USD', label: 'Dolar Americano' },
-        { value: 'EUR', label: 'Euro' },
-        { value: 'GBP', label: 'Libra Esterlina' },
-        { value: 'JPY', label: 'Yen Japones' },
-        { value: 'CNY', label: 'Yuan Chino' },
-        { value: 'KRW', label: 'Won Surcoreano' },
-        { value: 'ARS', label: 'Peso Argentino' },
-        { value: 'MXN', label: 'Peso Mexicano' },
-        { value: 'COP', label: 'Peso Colombiano' },
-        { value: 'BRL', label: 'Real Brasilero' },
-        { value: 'CLP', label: 'Peso Chileno' },
-        { value: 'VEF', label: 'Bolivar Venezolano' },
-        { value: 'PEN', label: 'Sol Peruano' },
-        { value: 'UYU', label: 'Peso Uruguayo' },
-        { value: 'PYG', label: 'Guarani Paraguayo' },
-        { value: 'BOB', label: 'Boliviano' },
-    ]
 
     return (
         <>
@@ -123,9 +119,9 @@ const Home = () => {
             >
                 <Typography variant="h1" textAlign={'center'}>Conversos de criptomonedas</Typography>
                 <Card sx={{
-                    width: '70%',
+                    width: '65%',
                     backgroundColor: '#f5f5f5',
-                    padding: '1.8rem',
+                    padding: '1.5rem',
                     borderRadius: '1rem',
                     boxShadow: '0 0 10px rgba(0, 0, 0, 0.5)',
                 }}>
@@ -181,7 +177,7 @@ const Home = () => {
                                     <Autocomplete
                                         disableClearable
                                         id="tags-outlined"
-                                        options={optionMoneda}
+                                        options={optionsCurrency}
                                         fullWidth
                                         getOptionLabel={(option) => option.value}
                                         filterSelectedOptions
@@ -202,6 +198,7 @@ const Home = () => {
                                 <ToggleButton
                                     value="check"
                                     selected={selected}
+                                    onClick={() => { handleChangePosition() }}
                                     onChange={() => {
                                         setSelected(!selected);
                                     }}
@@ -263,14 +260,31 @@ const Home = () => {
                                 marginTop: '1rem',
                             }}
                         >
-                            <IconButton size="small">
-                                <img src={`https://www.cryptocompare.com${coninInfoSelected?.ImageUrl}`} style={{ width: '2.5rem' }} alt={coninInfoSelected?.Name} />
-                            </IconButton>
-                            <Typography
-                                variant="h3"
-                                textAlign={'center'}>
-                                {amount} {coninInfoSelected?.FullName} son = {(priceConversion * amount).toFixed(2)} {currency}
-                            </Typography>
+                            {selected ?
+                                (<>
+                                    <IconButton size="small" sx={{ marginRight: '0.3rem', }}>
+                                        <img src={`https://www.cryptocompare.com${coninInfoSelected?.ImageUrl}`} style={{ width: '2.5rem' }} alt={coninInfoSelected?.Name} />
+                                    </IconButton>
+                                    <Typography
+                                        variant="h3"
+                                        textAlign={'center'}>
+                                        {amount} {coninInfoSelected?.FullName} son = {
+                                            (priceConversion * amount).toFixed(2) + ' '
+                                        } {currency}
+                                    </Typography>
+                                </>) :
+                                (<>
+                                    <Typography
+                                        variant="h3"
+                                        textAlign={'center'}>
+                                        {amount} {currency} son = {
+                                            (amount * priceConversion).toFixed(10) + ' '
+                                        } {coninInfoSelected?.FullName}
+                                    </Typography>
+                                    <IconButton size="small" sx={{ marginLeft: '0.3rem', }}>
+                                        <img src={`https://www.cryptocompare.com${coninInfoSelected?.ImageUrl}`} style={{ width: '2.5rem' }} alt={coninInfoSelected?.Name} />
+                                    </IconButton>
+                                </>)}
                         </Box>
                     )}
                 </Card>
